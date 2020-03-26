@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Str;
 
 class SetupVueJs extends Command
 {
@@ -14,7 +15,10 @@ class SetupVueJs extends Command
      *
      * @var string
      */
-    protected $signature = 'make:vuejs {delete_old=1}';
+    protected $signature = 'make:vuejs
+                            {page_name?}
+                            {--kjs : keep old javascipt files}
+                            {--g : generate new page}';
 
     /**
      * The console command description.
@@ -40,16 +44,81 @@ class SetupVueJs extends Command
      */
     public function handle(Filesystem $fs)
     {
-        // extract root directory
-        $root = $fs->dirname($fs->dirname($fs->dirname(__DIR__)));
-        $js = $root . '/resources/js/';
+        $js = resource_path('js');
 
         // move to resources/js directory
         chdir($js);
 
-        // create required directories
+        if ($this->option('g')) {
+            if (!$this->argument('page_name')) {
+                $this->error('you must enter a page name');
+                return;
+            }
 
-        if ($fs->exists($js . 'pages')) {
+            if (!$fs->exists('pages')) {
+                $this->error('pages directory not found');
+                return;
+            }
+
+            chdir('pages');
+
+            $pageName = $this->argument('page_name');
+            $kebpage = Str::kebab($this->argument('page_name'));
+
+            // check if page is exists any way
+            if ($fs->exists($kebpage . '.ts')) {
+                $this->error("page $kebpage already exists");
+                if (!$this->confirm('overwrite page?')) {
+                    return;
+                }
+            }
+
+            $fs->put(
+                $kebpage . '.ts',
+                $this->getNewPageTxt($pageName)
+            );
+
+            $this->info(
+                $kebpage . '.ts was created successfully'
+            );
+
+            chdir('../');
+
+            $txt = $fs->get('app.ts');
+            $txt_lines = explode("\n", $txt);
+            $output = [];
+            $lastCompnent = '';
+
+            for ($i = 0; $i < sizeof($txt_lines); $i++) {
+                // get last import page statement
+                $c = $txt_lines[$i];
+                if (str::startsWith($c, 'import') && Str::contains($c, './pages') && strlen($txt_lines[$i + 1]) === 1) {
+                    // extract last component name from import statement
+                    $lastCompnent = explode(" ", $c)[1];
+                    // assign this line first then add new line
+                    $output[] = $c;
+                    $output[] = "import $pageName from './pages/" . $kebpage . "';";
+                    continue;
+                }
+
+                if (trim($c) === $lastCompnent . ',') {
+                    $output[] = $c;
+                    $output[] = "\t    " . $pageName . ",";
+                    continue;
+                }
+
+
+                $output[] = $c;
+            }
+
+            // write to app.ts
+            $fs->put('app.ts', implode("\n", $output));
+
+            return;
+        }
+
+        // create required directories
+        if ($fs->exists($js . '/pages')) {
             $this->info('All files was created succefully');
             return;
         }
@@ -62,13 +131,14 @@ class SetupVueJs extends Command
         chdir('pages');
 
         $fs->put('index-template.html', self::$indexHtml);
-        $fs->put('Super.ts', self::$super);
-        $fs->put('Home.ts', self::$home);
+        $fs->put('super.ts', self::$super);
+        $fs->put('home.ts', self::$home);
 
         chdir('../');
 
         // remove useless files if no argument
-        if (!!(int) $this->argument('delete_old')) {
+        if (!$this->option('kjs')) {
+            $this->info('removing old javascript files');
             $fs->delete('app.js');
             $fs->delete('bootstrap.js');
 

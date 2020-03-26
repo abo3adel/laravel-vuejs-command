@@ -6,7 +6,7 @@ trait VueFilesTxt {
     private static $App = <<<EOT
 import { Vue } from 'vue-property-decorator';
 import Axios from 'axios';
-import Home from './pages/Home';
+import Home from './pages/home';
 
 Axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
@@ -59,15 +59,12 @@ TS;
 
     private static $home = <<<'TS'
 import { Component, Prop } from 'vue-property-decorator';
-import Super from './Super';
+import Super from './super';
 
 @Component
 export default class Home extends Super {
-    name: string = 'asd';
-    id: number = 5;
-
     public log() {
-        console.log(this.name);
+        console.log('eee');
     }
 
     beforeCreate() {
@@ -111,4 +108,21 @@ MX;
         @yield('content')
     </{{$component}}>
 HML;
+
+    private function getNewPageTxt($pageName) : string
+    {
+        return <<<TS
+import { Component } from 'vue-property-decorator';
+import Super from './super';
+
+@Component
+export default class $pageName extends Super {
+    
+
+    beforeCreate() {
+        this._methods = [];
+    }
+}       
+TS;
+    }
 }
