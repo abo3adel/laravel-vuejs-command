@@ -1,2 +1,2 @@
 # laravel-commands
-a list of my most used laravel commands
+command to build my vuejs starter template
